@@ -89,67 +89,85 @@ function scoreRind(r){
   var s=50+RIND_COLORS[r.color].s+RIND_FINE[r.fine].s+RIND_CRACK[r.crack].s+RIND_SONG[r.song].s+RIND_MANG[r.mang].s;
   return Math.max(5,Math.min(98,s));
 }
-function genStone(tierIdx, isZhen){
-  var T=TIERS[tierIdx||0];
-  var seed=(++_uid)*7919+Math.floor(rnd()*1e9);
-  var rind;
-  if(isZhen){ // 镇店石：皮壳按高分权重抽，看着就是全场最好的那块
-    rind={ color:pickW([26,22,16,12,10,6,5,3]), fine:pickW([42,32,16,7,3]), crack:pickW([55,28,11,6]), song:pickW([4,20,34,42]), mang:pickW([6,22,34,38]) };
-  } else {
-    rind={ color:Math.floor(rnd()*8), fine:pickW([16,26,28,18,12]), crack:pickW([22,34,26,18]), song:pickW([38,30,20,12]), mang:pickW([40,28,19,13]) };
+/* ===== 新生成顺序（v22 候选）：先抽内部，再按品质算价值 =====
+   内部权重按铺子档次分行：档次越高，种色整体越好、裂棉越少；
+   另有很小概率强制抽到「玻璃种+满绿/帝王绿+轻瑕疵」的好料，保住满绿暴富的尾巴。 */
+var INNER_W=[
+  { z:[34,30,18,10,5,3],  c:[36,26,16,11,6,3,2],  k:[16,34,50], t:[20,36,44], s:[52,48] },
+  { z:[28,29,20,13,7,4],  c:[29,25,18,13,8,4,2],  k:[22,36,42], t:[26,37,37], s:[57,43] },
+  { z:[22,27,22,15,8,5],  c:[23,25,20,16,9,5,3],  k:[28,38,34], t:[32,37,31], s:[61,39] },
+  { z:[20,26,24,16,9,5],  c:[20,24,22,17,10,5,2], k:[34,38,28], t:[38,36,26], s:[64,36] },
+  { z:[18,25,25,18,9,5],  c:[18,23,24,19,10,4,2], k:[36,38,26], t:[42,35,23], s:[68,32] }
+];
+var JACKPOT_P=[0.032,0.032,0.032,0.032,0.045];
+var VALUE_K=[407,1039,2501,6094,15128];
+var VALUE_KZ=[900,1995,5420,13544,34297];
+function sampleInnerV2(ti, isZhen){
+  if(rnd()<JACKPOT_P[ti]) return { zhong:5, color:(rnd()<0.5?5:6), crack:pickW([80,20,0]), cotton:pickW([75,25,0]), spot:0 };
+  var W=INNER_W[isZhen?Math.min(4,ti+1):ti];
+  return { zhong:pickW(W.z), color:pickW(W.c), crack:pickW(W.k), cotton:pickW(W.t), spot:pickW(W.s) };
+}
+/* 皮壳不再独立乱抽：跟着内部走——里面色好，松花蟒带倾向于明显；种老，皮倾向于细；
+   里面裂重，皮上裂也倾向于多。只是倾向，不是保证，皮壳照样会骗人。 */
+function drawRindLinked(inner, isZhen){
+  function sh(base, deltas, amt){ return base.map(function(w,i){ return Math.max(1, w+deltas[i]*amt); }); }
+  var cB=inner.color-2, zB=inner.zhong-2, kB=inner.crack-1;
+  if(isZhen){
+    return { color:pickW([26,22,16,12,10,6,5,3]),
+      fine:pickW(sh([42,32,16,7,3 ],[3.5,1.6,-0.6,-1.9,-2.6],zB)),
+      crack:pickW(sh([55,28,11,6 ],[-4,-0.8,1.9,2.9],kB)),
+      song:pickW(sh([4,20,34,42 ],[-4.8,-1.6,1.6,4.8],cB*0.8)),
+      mang:pickW(sh([6,22,34,38 ],[-4.8,-1.6,1.6,4.8],cB*0.5)) };
   }
+  return { color:Math.floor(rnd()*8),
+    fine:pickW(sh([16,26,28,18,12 ],[3.5,1.6,-0.6,-1.9,-2.6],zB)),
+    crack:pickW(sh([22,34,26,18 ],[-4,-0.8,1.9,2.9],kB)),
+    song:pickW(sh([38,30,20,12 ],[-4.8,-1.6,1.6,4.8],cB*0.8)),
+    mang:pickW(sh([40,28,19,13 ],[-4.8,-1.6,1.6,4.8],cB*0.5)) };
+}
+function genStone(tierIdx, isZhen){
+  var T=TIERS[tierIdx||0], ti=tierIdx||0;
+  var seed=(++_uid)*7919+Math.floor(rnd()*1e9);
   var weight=Math.round(U(0.6,4.8)*10)/10;
+  // —— 先抽内部：种/色/裂/棉/黑点 ——
+  var inner=sampleInnerV2(ti, isZhen);
+  // —— 皮壳跟着内部走（弱关联），标价仍只看皮壳与档次 ——
+  var rind=drawRindLinked(inner, isZhen);
   var S=scoreRind(rind);
-  // —— 随机流 A：标价，只看所在档次与皮壳 ——
-  // 在本档区间内对数均匀取点，再按皮壳评分小幅挪位（皮好靠上限、皮差靠下限），最后夹回区间
   var lp=Math.log(T.pMin)+(Math.log(T.pMax)-Math.log(T.pMin))*rnd();
   var price=Math.exp(lp)*(0.72+(S/100)*0.56);
   price=Math.max(T.pMin,Math.min(T.pMax,price));
-  if(isZhen) price=T.pMax*U(1.5,2.3); // 镇店石贵出本档上限一大截
+  if(isZhen) price=T.pMax*U(1.5,2.3);
   price=Math.max(50,Math.round(price/10)*10);
-  // —— 随机流 B：真实价值，先按本档分布抽结果档，再抽内部 ——
-  var cat=pickW(T.dist);
-  var rr=(T.catR?T.catR[cat]:CAT_R[cat]); // 拍卖场用自己压到低端的大涨/真爆区间，别档用全局 CAT_R
-  var R=rr[0]+(rr[1]-rr[0])*Math.pow(rnd(), T.skew||1.8); // 档内向低端倾斜（拍卖场 skew 更大、压得更狠）
-  var inner=sampleInner([0,0,1,2,3][cat]); // 垮/小亏共用最差权重行，小赚中档，大涨高档，真爆强制
-  // —— 稀有色：按最终盈亏比 roll（小赚 5% / 大涨 12% / 真爆 30%），中了换色并按系数抬价值，
-  //    最终档位在结算时按抬完的实际盈亏比复核（一块小赚料切出蓝水 ×2，就是按大涨结算）
-  var rareC=rollRareColor(tierIdx||0, R);
-  if(rareC>=0){ inner.color=rareC; R*=RARE_MULT[rareC]; }
-  if(R>24) R=24; // 两段封顶：底子 R 由结果档区间定死、最高就是真爆上限 12 倍；乘完稀有色系数后封顶 24 倍——真爆+春带彩最多 24 倍，稀有色不再被 12 倍封顶白给（镇店石与普通石共用这一套生成，没有单独倍数）
-  var value=Math.max(20,Math.round(price*R)); R=value/price;
+  // —— 价值由内部品质算：系数 × 重量 × qualityOf × ±10% 浮动 ——
+  var med=Math.sqrt(T.pMin*T.pMax);
+  var raw=(isZhen?VALUE_KZ[ti]:VALUE_K[ti])*weight*Math.pow(qualityOf(inner),0.65)*Math.pow(price/med,0.35)*U(0.9,1.1);
+  // —— 稀有色照旧：按当前盈亏比 roll（小赚 5% / 大涨 12% / 真爆 30%），中了换色乘系数，24 倍封顶 ——
+  var rareC=rollRareColor(ti, raw/price);
+  var value=raw;
+  if(rareC>=0){ inner.color=rareC; value=raw*RARE_MULT[rareC]; }
+  if(value>price*24) value=price*24;
+  var crackCap=[Infinity,3.9,0.8][inner.crack]; // 裂纹封顶：细裂最高到大涨，大裂贯穿最高只到小亏——种色再好，裂贯穿了也卖不出价
+  if(value>price*crackCap) value=price*crackCap;
+  value=Math.max(20,Math.round(value));
   var name=STONE_NAMES[Math.floor(rnd()*STONE_NAMES.length)]+"·"+(seed%997+1)+"号";
-  // —— 打灯欺骗位：约 20% 的石头生成时就定死「打灯表现与内在不一致」——
-  //    照着亮、切开是白肉，或者照着全黑、里面闷着绿。打灯函数读到这个标记就把透光/有色信号反着报（见 torchAt）。
   var torchLie = rnd()<0.20;
-  // —— 局部团块（开窗/磨只能看到的那一小块）：整块的种色并不均匀，某一小片区域的种色和整块不同。
-  //    整块偏白时，那一片可能是全场唯一的绿（开窗见绿、切开只有窗口那点绿）；
-  //    整块是好色时，那一片也可能是块死白（窗口一般、切开里面满绿）。
-  //    窗口/磨口落在团块上，看到的就是团块的真种色——是真的，只是不代表整块（见 localInnerAt）。
   var pocket=null;
   var prng=mulberry32(seed*41+9);
   function prandDir(){ var th=Math.acos(-1+prng()*2), ph=prng()*Math.PI*2; return { x:Math.sin(th)*Math.cos(ph), y:Math.cos(th), z:Math.sin(th)*Math.sin(ph) }; }
-  if(inner.color<=2 && rnd()<0.30){ // 白料里的一团绿
+  if(inner.color<=2 && rnd()<0.40){
     var pd=prandDir();
     pocket={ x:pd.x, y:pd.y, z:pd.z, radius:U(0.45,0.65), color:3+pickW([30,42,28]), zhong:Math.min(5, inner.zhong+1+Math.floor(rnd()*2)) };
-  } else if(inner.color>=4 && rnd()<0.30){ // 好料里的一块死白
+  } else if(inner.color>=4 && rnd()<0.40){
     var qd=prandDir();
     pocket={ x:qd.x, y:qd.y, z:qd.z, radius:U(0.45,0.65), color:Math.floor(rnd()*2), zhong:Math.max(0, inner.zhong-1-Math.floor(rnd()*2)) };
-  } else if(rnd()<0.18){ // 中档料的局部偏差：那一片比整块明显好或明显差
+  } else if(rnd()<0.25){
     var md=prandDir();
     var shift=(rnd()<0.5?-2:2);
     pocket={ x:md.x, y:md.y, z:md.z, radius:U(0.45,0.65), color:Math.max(0,Math.min(5,inner.color+shift)), zhong:Math.max(0,Math.min(5,inner.zhong+(shift>0?1:-1))) };
   }
-  return { id:"s"+seed+"_"+_uid, seed:seed, name:name, rind:rind, S:S, weight:weight, price:price, inner:inner, value:value, tier:tierIdx||0, zhen:!!isZhen, windowed:false, grindStep:0, winDir:null, sliceDir:null, torchLie:torchLie, pocket:pocket };
+  return { id:"s"+seed+"_"+_uid, seed:seed, name:name, rind:rind, S:S, weight:weight, price:price, inner:inner, value:value, tier:ti, zhen:!!isZhen, windowed:false, grindStep:0, winDir:null, sliceDir:null, torchLie:torchLie, pocket:pocket };
 }
-function sampleInner(tier){
-  /* 真爆：强制玻璃种 + 轻微瑕疵，颜色先强制满绿/帝王绿。
-     稀有色不在这里抽：genStone 在价值定档之后按最终盈亏比统一 roll（小赚及以上都有机会，见 rollRareColor），
-     所以这里的颜色权重表只有 7 个绿色系 */
-  if(tier===3) return { zhong:5, color:(rnd()<0.5?5:6), crack:pickW([80,20,0]), cotton:pickW([75,25,0]), spot:0 };
-  return { zhong:pickW(TIER_W_ZHONG[tier]), color:pickW(TIER_W_COLOR[tier]), crack:pickW(TIER_W_CRACK[tier]), cotton:pickW(TIER_W_COTTON[tier]), spot:pickW(TIER_W_SPOT[tier]) };
-}
-
 function localInnerAt(st, dir){
   var li={ zhong:st.inner.zhong, color:st.inner.color, crack:st.inner.crack, cotton:st.inner.cotton, spot:st.inner.spot };
   if(st.pocket && dir){

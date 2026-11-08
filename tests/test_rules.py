@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -31,7 +32,10 @@ with tempfile.TemporaryDirectory() as folder:
     data['owned']=[{'id':'held'}];data['activeCut']={'stoneId':'held','phase':'new','grindFees':0}
     game._write(path,data);assert '先把手里这块切完' in game.run('领取800')
     data['owned']=[];data.pop('activeCut');data['shops']={'0':[],'1':[]};game._write(path,data)
-    snap=web.snapshot(path);game.run('领取800')
+    snap=web.snapshot(path)
+    old_revision=hashlib.sha256(path.read_bytes()).hexdigest()
+    assert web.save_update(path,old_revision,copy.deepcopy(snap['save'])) is None
+    game.run('领取800')
     stale=copy.deepcopy(snap['save']);stale['money']=1
     assert web.save_update(path,snap['revision'],stale) is None
     assert web.snapshot(path)['save']['money']==800

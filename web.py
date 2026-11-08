@@ -14,7 +14,7 @@ LIMIT=2*1024*1024
 MUTABLE={'money','maxWealth','tier','unlockedTier','shops','owned','cabinet','history',
          'activeCut','pendingNpc','torchReadings','xiaojieVisits','shelfVersion'}
 
-def revision(raw):return hashlib.sha256(raw).hexdigest()
+def revision(raw):return 'jade-v22:'+hashlib.sha256(raw).hexdigest()
 
 def read_save(path):
     with open(path,'rb') as source:raw=source.read(LIMIT+1)

@@ -12,6 +12,8 @@
 
 ## 运行方式
 
+### 单人在线版
+
 单文件网页，不需要构建、不需要后端：
 
 - **在线玩**：手机浏览器打开 [hual66209-max.github.io/dushi-xiaopu](https://hual66209-max.github.io/dushi-xiaopu/) 就能玩；
@@ -19,6 +21,46 @@
 - 或把 `index.html` 放到任意静态托管（自己的服务器等）上，用手机打开链接玩。
 
 游戏进度保存在浏览器本地（localStorage），换浏览器或清缓存会丢档，请留意。
+
+### 网页和 AI 共用存档
+
+共用存档需要在同一台电脑上运行本项目的网页服务和 MCP 工具。目前支持 Linux / macOS，需要 Python 3.11 及以上、Node.js（`node` 在 PATH 中）和支持 WebGL 的浏览器，Windows 暂未适配。GitHub Pages 在线版是单人版，不能和下面的本机存档自动同步。
+
+下载本仓库完整源码，在项目目录执行：
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python web.py
+```
+
+用同一台电脑的浏览器打开 `http://127.0.0.1:8088/`。首次运行会在 `data/save.json` 新建本金 ¥10,000 的存档。单人在线版原有的浏览器存档不会自动迁移或覆盖这份存档。不要把 `data/` 上传或发送给别人。
+
+在支持 MCP 的 AI 客户端中添加下面的配置，把示例路径改成该电脑上本项目的绝对路径：
+
+```json
+{
+  "mcpServers": {
+    "jade-shop": {
+      "command": "/path/to/dushi-xiaopu/.venv/bin/python",
+      "args": ["/path/to/dushi-xiaopu/mcp_server.py"]
+    }
+  }
+}
+```
+
+客户端连接后可调用 `jade_shop(text="帮助")`。客户端启动 MCP 子进程时的 `PATH` 需要能找到 Node.js。网页和 AI 都使用同一个存档；如果对方操作后网页还是旧状态，网页会提示重新打开，避免覆盖存档。
+
+也可以在启动网页和 MCP 工具时将 `JADE_DATA_DIR` 设为相同的绝对目录；两边目录不同就会使用不同存档。`web.py` 仅监听本机，没有远程登录和多用户隔离，请勿直接开放到互联网。
+
+共用版买不起所有已解锁货架上的石头、手里也没有待切石头时，可以领取 ¥800 重新开始；没有商城积分兑换功能。
+
+### 源码在哪里
+
+- `index.html`：GitHub Pages 单人版网页，界面、玩法和 3D 代码都在这里。
+- `shared.html`：人和 AI 共用存档的网页源码，由 `web.py` 提供。
+- `web.py`、`game.py`、`engine.cjs`、`mcp_server.py`：共用存档服务和 AI 工具源码。
+- `tests/`：共用版的规则与集成检查。
 
 ## 许可
 

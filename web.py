@@ -79,7 +79,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.allowed_host():return self.send(403,{'ok':False})
         try:
-            if self.path in ('/','/index.html'):return self.send(200,(ROOT/'index.html').read_bytes(),'text/html; charset=utf-8')
+            if self.path in ('/','/index.html'):return self.send(200,(ROOT/'shared.html').read_bytes(),'text/html; charset=utf-8')
             if self.path=='/api/save':return self.send(200,{'ok':True,**snapshot(game.SAVE)})
             self.send(404,{'ok':False})
         except (OSError,ValueError,json.JSONDecodeError):self.send(500,{'ok':False,'error':'存档暂时无法读取'})

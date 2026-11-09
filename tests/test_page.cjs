@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
-const html=fs.readFileSync(__dirname+'/../index.html','utf8');
+const html=fs.readFileSync(__dirname+'/../shared.html','utf8');
 const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);
 assert.equal(scripts.length,3);scripts.forEach(s=>new vm.Script(s));
 const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1])),nodes={};

@@ -27,6 +27,9 @@ async def test(folder):
             with urlopen(req,timeout=4) as r:return r.status,json.load(r)
         except HTTPError as e:return e.code,json.load(e)
     try:
+        with urlopen(base+'/',timeout=4) as r:
+            page=r.read().decode('utf-8')
+            assert 'sharedRevision' in page and './api/save' in page
         code,initial=request('/api/save');assert code==200 and initial['save']['money']==10000
         assert request('/api/save',headers={'Host':'untrusted.example'})[0]==403
         params=StdioServerParameters(command=sys.executable,args=[str(ROOT/'mcp_server.py')],

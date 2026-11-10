@@ -105,11 +105,12 @@ def _shelf(save, name):
         r = stone['rind']
         attrs = ' '.join(catalog[key][r[key if key != 'colors' else 'color']]
                          for key in ('colors', 'fine', 'crack', 'song', 'mang'))
-        return f"{stone['name']} {stone['weight']}kg ¥{stone['price']:,} 皮壳{stone['S']}｜{attrs}"
+        name = re.sub(r'·\d+号$', '', stone['name'])
+        return f"{name} {stone['weight']}kg ¥{stone['price']:,} 皮壳{stone['S']}｜{attrs}"
     normal = sorted((stone for stone in shelf if not stone['zhen']),key=lambda s:s['shelfNo'])
     crown = [stone for stone in shelf if stone['zhen']]
     lines = [f'{name} ｜ 刷新¥{fee:,}']
-    lines.extend(f"{stone['shelfNo']}. {detail(stone)}" for stone in normal)
+    lines.extend(f"{stone['shelfNo']}号 {detail(stone)}" for stone in normal)
     lines.extend('👑 镇店石 ' + detail(stone) for stone in crown)
     return '\n'.join(lines)
 
@@ -265,7 +266,7 @@ def _torch(save):
         return result
     normal,crown=_ordered(shelf)
     result=[line(f"{s['shelfNo']}号",s) for s in normal]+[line('👑',s) for s in crown]
-    return '\n'.join(result),bool(needs)
+    return '💡 打灯仅供参考，皮壳厚度和颜色会干扰结果哦~\n' + '\n'.join(result),bool(needs)
 
 
 def _round_stats():
@@ -442,7 +443,7 @@ def run(command, path=SAVE):
            bool(re.fullmatch(r'买\s*(?:[0-9]+|镇店)',command)) or bool(re.fullmatch(r'卖\s*柜里\s*[0-9]+',command)))
     help_text=('打开：查看本金、统计和能去的铺子。\n去 铺子名：查看货架，例如“去 垃圾铺”。\n'
                '刷新：付费刷新当前铺子。\n打灯：查看当前货架的打灯表现，照到和别处不一样的地方会提示。\n'
-               '买 号码 / 买 镇店：购买石头；遇到 NPC 时按提示说“跟”“要”或“不要了”。\n'
+               '买 货架序号，如：买 1 / 买 镇店；遇到 NPC 时按提示说“跟”“要”或“不要了”。\n'
                '切 / 擦窗 顶上、腰上或松花处、底下 / 磨：处理手里的石头，每块只能擦窗一次。\n'
                '卖 / 收藏：处理切好的石头；看珍藏柜 / 卖 柜里1：查看或卖掉珍藏。\n'
                '买不起所有可用货架上的石头且手里没有石头时，可说“领取800”获得800本金。')
